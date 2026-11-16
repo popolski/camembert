@@ -62,6 +62,7 @@ public sealed class MainViewModel : ViewModelBase
         _settings = _settingsStore.Load();
         ThemeService.Apply(_settings.Theme);
         _settingsLocation = "Réglages enregistrés dans " + _settingsStore.FilePath;
+        Cleanup = new CleanupViewModel(path => _ = ScanAsync(path, fast: false), _rules);
         ScanCommand = new RelayCommand(path => _ = ScanAsync((string)path!, fast: true));
         StandardScanCommand = new RelayCommand(path => _ = ScanAsync((string)path!, fast: false));
         ChooseFolderCommand = new RelayCommand(_ => ChooseFolder());
@@ -136,12 +137,16 @@ public sealed class MainViewModel : ViewModelBase
     {
         HomeMessage = message;
         Show(Screen.Home);
+        Cleanup.Refresh();
         // Hors du thread d'interface : un disque dur en veille met plusieurs secondes à répondre.
         Volumes = await Task.Run(() => VolumeService.GetLocalVolumes().Select(v => new VolumeRow(v)).ToList());
     }
 
     List<VolumeRow> _volumes = [];
     public List<VolumeRow> Volumes { get => _volumes; private set => Set(ref _volumes, value); }
+
+    /// <summary>Nettoyage recommandé, affiché sur l'accueil.</summary>
+    public CleanupViewModel Cleanup { get; }
 
     string _homeMessage = "";
     public string HomeMessage { get => _homeMessage; private set => Set(ref _homeMessage, value); }
@@ -193,6 +198,7 @@ public sealed class MainViewModel : ViewModelBase
         RefreshBasket("");
         SetFocus(SunburstControl.NoNode);
 
+        Cleanup.Cancel(); // la mesure du nettoyage ne doit pas concurrencer l'analyse
         _rootPath = Path.GetFullPath(path);
         _fastRequested = fast;
         _cancellation = new CancellationTokenSource();

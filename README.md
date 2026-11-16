@@ -110,13 +110,33 @@ Garde-fous :
   message « Modifié depuis l'analyse » : relancer l'analyse.
 - Aucun contournement des droits : un fichier verrouillé ou protégé est signalé, pas forcé.
 
+## Nettoyage recommandé
+
+Sur l'accueil, sous les volumes, mesuré en arrière-plan à chaque retour à l'accueil (repris de la version Python) :
+
+| Recommandation | Action |
+|---|---|
+| Fichiers temporaires (`%TEMP%`, éléments de plus de 24 h) | Mettre à la Corbeille |
+| Caches des navigateurs (Chrome, Edge, Brave, Firefox) | Mettre à la Corbeille |
+| Rapports de plantage (`%LOCALAPPDATA%\CrashDumps`) | Mettre à la Corbeille |
+| Caches développeur (npm, pip) | Mettre à la Corbeille |
+| Corbeille (tous les disques) | Vider la Corbeille : **définitif**, seule action irréversible de l'application |
+| Téléchargements (plus de 100 Mo) | Analyser le dossier dans le diagramme |
+| Fichiers temporaires de Windows (`Windows\Temp`, Windows Update, `Minidump`, `MEMORY.DMP`) | Information ; bouton vers Paramètres › Stockage |
+| `hiberfil.sys`, `Windows.old` (plus de 100 Mo) | Information : comment les supprimer avec Windows |
+
+Chaque action demande confirmation (« Non » par défaut) et refait la liste juste avant, pour confirmer exactement
+ce qui sera envoyé. Les éléments passent par les mêmes vérifications que le panier ; ceux qui sont ouverts par un
+programme (navigateur lancé…) sont laissés en place et comptés. Camembert ne supprime rien dans le dossier Windows :
+il renvoie vers les outils de Windows, qui le font avec les droits nécessaires.
+
 ## Structure
 
 | Projet | Rôle |
 |---|---|
-| `Camembert.Core` | Réglages (`SettingsStore`), messages d'erreur en français (`ErrorText`), arbre compact (`FileTree`), agrégation, modèle du sunburst, recherche (`TreeSearch`), panier (`Basket`), emplacements protégés (`DeletionRules`), contrat `IScanEngine` |
+| `Camembert.Core` | Nettoyage recommandé (`Cleanup`), réglages (`SettingsStore`), messages d'erreur en français (`ErrorText`), arbre compact (`FileTree`), agrégation, modèle du sunburst, recherche (`TreeSearch`), panier (`Basket`), emplacements protégés (`DeletionRules`), contrat `IScanEngine` |
 | `Camembert.Scanner` | `Standard/StandardScanEngine` et `Ntfs/NtfsScanEngine` (+ `MftIndex`, décodage des enregistrements) |
-| `Camembert.Windows` | Volumes, Explorateur, Corbeille (`Shell/SafeDelete`), aperçus (`Preview/PreviewLoader`), analyse dans un processus élevé (`Elevation/ElevatedScan`) |
+| `Camembert.Windows` | Volumes, Explorateur, Corbeille (`Shell/SafeDelete`, `Shell/RecycleBin`), aperçus (`Preview/PreviewLoader`), analyse dans un processus élevé (`Elevation/ElevatedScan`) |
 | `Camembert.App` | Fenêtre WPF, ViewModels, contrôle sunburst SkiaSharp, thèmes (`Themes/`), journal |
 
 `FileTree` : tableaux parallèles indexés par identifiant de nœud (environ 55 octets par entrée, nom compris).

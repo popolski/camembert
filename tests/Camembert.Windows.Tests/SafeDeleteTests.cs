@@ -135,6 +135,43 @@ public sealed class SafeDeleteTests : IDisposable
     }
 
     [Fact]
+    public async Task Large_batches_go_to_the_recycle_bin_and_a_locked_file_does_not_stop_the_others()
+    {
+        var requests = Enumerable.Range(0, 250).Select(i => Scanned(NewFile($"CamembertTests lot {i:000}.tmp", 10 + i))).ToList();
+        var (sizeBefore, countBefore) = RecycleBin.Measure();
+        var reports = new List<int>();
+
+        List<DeleteResult> results;
+        using (new FileStream(requests[42].Path, FileMode.Open, FileAccess.Read, FileShare.None)) // au milieu du premier lot
+            results = await SafeDelete.SendToRecycleBinAsync(requests, _rules, IntPtr.Zero, new SyncProgress(reports.Add));
+
+        var recycled = RecycledFromThisTest();
+        try
+        {
+            Assert.Equal(249, results.Count(r => r.Deleted));
+            Assert.False(results[42].Deleted);
+            Assert.NotNull(results[42].Problem);
+            Assert.True(File.Exists(requests[42].Path));
+            Assert.Equal(249, recycled.Count);
+            Assert.Equal([100, 200, 250], reports);
+
+            var (sizeAfter, countAfter) = RecycleBin.Measure();
+            Assert.Equal(countBefore + 249, countAfter);
+            Assert.Equal(sizeBefore + requests.Where((_, i) => i != 42).Sum(r => r.Size), sizeAfter);
+        }
+        finally
+        {
+            foreach (var (info, content) in recycled) { File.Delete(content); File.Delete(info); }
+        }
+    }
+
+    /// <summary>Progress&lt;T&gt; publie sur un autre thread ; ici, appel immédiat pour vérifier l'ordre des rapports.</summary>
+    sealed class SyncProgress(Action<int> report) : IProgress<int>
+    {
+        public void Report(int value) => report(value);
+    }
+
+    [Fact]
     public async Task Files_and_folders_really_go_to_the_recycle_bin()
     {
         string file = NewFile("CamembertTests fichier.bin", 1234);

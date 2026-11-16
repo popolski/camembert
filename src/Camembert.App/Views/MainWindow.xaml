@@ -49,6 +49,38 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <Button Content="Choisir un dossier…" Command="{Binding ChooseFolderCommand}" Padding="18,8" Margin="0,8,0,0" HorizontalAlignment="Left" />
+
+                <!-- Nettoyage recommandé -->
+                <DockPanel Margin="0,36,0,6">
+                    <Button DockPanel.Dock="Right" Content="Actualiser" Command="{Binding Cleanup.RefreshCommand}" Padding="10,4"
+                            AutomationProperties.Name="Actualiser le nettoyage recommandé" />
+                    <TextBlock Text="Nettoyage recommandé" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </DockPanel>
+                <TextBlock Text="{Binding Cleanup.Summary}" Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" Margin="0,0,0,12"
+                           AutomationProperties.AutomationId="CleanupSummary" />
+                <ItemsControl ItemsSource="{Binding Cleanup.Cards}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{DynamicResource PanelBorder}" BorderThickness="1" CornerRadius="6" Padding="16,12" Margin="0,0,0,10">
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" VerticalAlignment="Center" Padding="12,5" Margin="16,0,0,0"
+                                            Content="{Binding ActionLabel}" Command="{Binding Command}" CommandParameter="{Binding}"
+                                            AutomationProperties.Name="{Binding ActionName}"
+                                            Visibility="{Binding HasAction, Converter={StaticResource Visible}}" />
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding SizeText}" FontWeight="SemiBold" Margin="12,0,0,0" />
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding Description}" Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                        <TextBlock Text="{Binding Status}" Foreground="{DynamicResource WarningText}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                                   Visibility="{Binding HasStatus, Converter={StaticResource Visible}}" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </StackPanel>
         </ScrollViewer>
 

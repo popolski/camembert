@@ -58,11 +58,13 @@ public static class SafeDelete
     }
 
     /// <summary>
-    /// Envoie les éléments à la Corbeille, un par un, chacun revérifié juste avant. Ne lève pas d'exception pour
-    /// un élément en échec : chaque résultat dit ce qui s'est passé. À appeler après confirmation de l'utilisateur.
+    /// Envoie les éléments à la Corbeille, chacun revérifié juste avant. Ne lève pas d'exception pour un élément en
+    /// échec : chaque résultat dit ce qui s'est passé. À appeler après confirmation de l'utilisateur.
     /// </summary>
     /// <param name="owner">Fenêtre propriétaire d'un éventuel avertissement de Windows.</param>
-    public static Task<List<DeleteResult>> SendToRecycleBinAsync(IReadOnlyList<DeleteRequest> requests, DeletionRules rules, IntPtr owner)
+    /// <param name="progress">Nombre d'éléments traités, signalé au fil de l'opération.</param>
+    public static Task<List<DeleteResult>> SendToRecycleBinAsync(IReadOnlyList<DeleteRequest> requests, DeletionRules rules, IntPtr owner,
+        IProgress<int>? progress = null)
     {
         var completion = new TaskCompletionSource<List<DeleteResult>>();
         // L'API Shell exige un thread STA ; hors du thread d'interface pour ne pas la figer.
@@ -70,13 +72,21 @@ public static class SafeDelete
         {
             try
             {
-                var results = new List<DeleteResult>(requests.Count);
-                foreach (var request in requests)
+                var problems = new string?[requests.Count];
+                for (int start = 0; start < requests.Count; start += BatchSize)
                 {
-                    string? problem = Check(request, rules) ?? Recycle(request.Path, owner);
-                    results.Add(new DeleteResult(request, problem is null, problem));
+                    int end = Math.Min(start + BatchSize, requests.Count);
+                    var ready = new List<int>();
+                    for (int i = start; i < end; i++)
+                        if ((problems[i] = Check(requests[i], rules)) is null) ready.Add(i);
+                    // Une seule opération Windows pour le lot ; ce qui reste ensuite (fichier verrouillé, qui
+                    // interrompt le lot…) est repris un par un, pour obtenir la raison de chaque échec.
+                    if (ready.Count > 1) RecycleBatch(ready.Select(i => requests[i].Path).ToList(), owner);
+                    foreach (int i in ready)
+                        if (ready.Count == 1 || Exists(requests[i].Path)) problems[i] = Recycle(requests[i].Path, owner);
+                    progress?.Report(end);
                 }
-                completion.SetResult(results);
+                completion.SetResult(requests.Select((r, i) => new DeleteResult(r, problems[i] is null, problems[i])).ToList());
             }
             catch (Exception e)
             {
@@ -88,8 +98,39 @@ public static class SafeDelete
         return completion.Task;
     }
 
-    // ponytail: une opération Shell par élément (résultat individuel sans implémenter IFileOperationProgressSink) ;
-    // regrouper en une seule opération avec un récepteur d'événements si des milliers d'éléments deviennent courants.
+    const int BatchSize = 100;
+
+    static bool Exists(string path) => File.Exists(path) || Directory.Exists(path);
+
+    /// <summary>Lot d'éléments en une opération ; le résultat de chacun se lit ensuite sur le disque.</summary>
+    static void RecycleBatch(List<string> paths, IntPtr owner)
+    {
+        IFileOperation? operation = null;
+        var items = new List<IntPtr>();
+        try
+        {
+            operation = (IFileOperation)Activator.CreateInstance(Type.GetTypeFromCLSID(FileOperationClass, throwOnError: true)!)!;
+            operation.SetOperationFlags(Flags);
+            operation.SetOwnerWindow(owner);
+            foreach (string path in paths)
+            {
+                if (SHCreateItemFromParsingName(path, IntPtr.Zero, typeof(IShellItem).GUID, out var item) < 0) continue;
+                items.Add(item);
+                operation.DeleteItem(item, IntPtr.Zero);
+            }
+            if (items.Count > 0) operation.PerformOperations();
+        }
+        catch (COMException)
+        {
+            // Les éléments restants seront repris un par un.
+        }
+        finally
+        {
+            foreach (var item in items) Marshal.Release(item);
+            if (operation is not null) Marshal.ReleaseComObject(operation);
+        }
+    }
+
     static string? Recycle(string path, IntPtr owner)
     {
         IFileOperation? operation = null;
