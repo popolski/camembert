@@ -1,0 +1,38 @@
+name: Compilation et publication
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write   # nécessaire uniquement pour joindre le ZIP à une version (tag v*)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Tests
+        run: dotnet test Camembert.sln -c Release
+
+      - name: ZIP portable
+        shell: pwsh
+        run: ./build/publish.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Camembert-portable-win-x64
+          path: artifacts/Camembert-portable-win-x64.zip
+
+      - name: Version publiée
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" artifacts/Camembert-portable-win-x64.zip --title "Camembert ${{ github.ref_name }}" --generate-notes

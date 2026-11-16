@@ -1,0 +1,10 @@
+﻿<Application x:Class="Camembert.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Thème (Fluent clair ou sombre, et Themes/Dark.xaml ou Light.xaml) appliqué au démarrage par ThemeService. -->
+    <Application.Resources>
+        <ResourceDictionary>
+            <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

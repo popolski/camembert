@@ -1,0 +1,9 @@
+bin/
+obj/
+artifacts/
+TestResults/
+.vs/
+*.user
+# Créés à côté de l'exécutable pendant les essais
+journaux/
+Camembert.settings.json

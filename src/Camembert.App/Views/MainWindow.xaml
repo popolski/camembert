@@ -1,0 +1,257 @@
+<Window x:Class="Camembert.App.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:Camembert.App.Controls"
+        xmlns:views="clr-namespace:Camembert.App.Views"
+        Title="Camembert" Width="1400" Height="840" MinWidth="900" MinHeight="560"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="Visible" />
+    </Window.Resources>
+    <Window.InputBindings>
+        <KeyBinding Key="Back" Command="{Binding UpCommand}" />
+    </Window.InputBindings>
+
+    <Grid>
+        <!-- Accueil : volumes et choix d'un dossier -->
+        <Button Content="Paramètres" Click="OnSettings" Padding="12,6" Margin="0,12,16,0" HorizontalAlignment="Right" VerticalAlignment="Top" Panel.ZIndex="1"
+                Visibility="{Binding IsHome, Converter={StaticResource Visible}}" />
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding IsHome, Converter={StaticResource Visible}}">
+            <StackPanel MaxWidth="720" Margin="32,40">
+                <TextBlock Text="Camembert" FontSize="34" FontWeight="SemiBold" />
+                <TextBlock Text="Choisissez un volume ou un dossier à analyser." Foreground="{DynamicResource SecondaryText}" Margin="0,4,0,20" />
+                <TextBlock Text="{Binding HomeMessage}" Foreground="{DynamicResource WarningText}" TextWrapping="Wrap" Margin="0,0,0,12" />
+                <ItemsControl ItemsSource="{Binding Volumes}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,0,0,14">
+                                <Button Padding="18,14" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                        Command="{Binding DataContext.ScanCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding Root}"
+                                        AutomationProperties.Name="{Binding Title}" ToolTip="Analyser ce volume">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding ScanNote}" Foreground="{DynamicResource SecondaryText}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="SemiBold" />
+                                        </DockPanel>
+                                        <ProgressBar Value="{Binding UsedPercent, Mode=OneWay}" Maximum="100" Height="6" Margin="0,10,0,8" />
+                                        <TextBlock Text="{Binding Detail}" Foreground="{DynamicResource SecondaryText}" />
+                                    </StackPanel>
+                                </Button>
+                                <!-- Toujours possible sans droits d'administrateur, plus lente. -->
+                                <Button Content="Analyse standard, sans droits d'administrateur" Padding="10,4" Margin="0,4,0,0" HorizontalAlignment="Right"
+                                        Background="Transparent" BorderThickness="0" Foreground="{DynamicResource SecondaryText}"
+                                        Visibility="{Binding FastAvailable, Converter={StaticResource Visible}}"
+                                        Command="{Binding DataContext.StandardScanCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding Root}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="Choisir un dossier…" Command="{Binding ChooseFolderCommand}" Padding="18,8" Margin="0,8,0,0" HorizontalAlignment="Left" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Analyse en cours -->
+        <StackPanel Width="560" VerticalAlignment="Center" Visibility="{Binding IsScanning, Converter={StaticResource Visible}}">
+            <TextBlock Text="{Binding ScanTitle}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+            <ProgressBar Value="{Binding ScanPercent, Mode=OneWay}" IsIndeterminate="{Binding ScanIndeterminate}" Maximum="100" Height="6" Margin="0,18,0,12" />
+            <TextBlock Text="{Binding ScanCounters}" FontSize="15" />
+            <TextBlock Text="{Binding ScanPath}" Foreground="{DynamicResource SecondaryText}" TextTrimming="CharacterEllipsis" Margin="0,6,0,20" />
+            <Button Content="Annuler" Command="{Binding CancelCommand}" Padding="18,8" HorizontalAlignment="Left" />
+        </StackPanel>
+
+        <!-- Résultat : fil d'Ariane, diagramme, liste et recherche -->
+        <Grid Visibility="{Binding IsResult, Converter={StaticResource Visible}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <DockPanel Margin="12,10,12,6">
+                <Button DockPanel.Dock="Left" Content="Volumes" Command="{Binding HomeCommand}" Padding="12,6" ToolTip="Revenir à la liste des volumes" />
+                <Button DockPanel.Dock="Left" Content="Actualiser" Command="{Binding RefreshCommand}" Padding="12,6" Margin="8,0,12,0" ToolTip="Relancer l'analyse" />
+                <Button DockPanel.Dock="Right" Content="Paramètres" Click="OnSettings" Padding="12,6" Margin="10,0,0,0" />
+                <TextBox DockPanel.Dock="Right" Width="260" Margin="12,0,0,0" VerticalAlignment="Center"
+                         Text="{Binding SearchName, UpdateSourceTrigger=PropertyChanged}"
+                         AutomationProperties.Name="Rechercher par nom" ToolTip="Rechercher un nom dans toute l'analyse" />
+                <TextBlock DockPanel.Dock="Right" Text="&#xE721;" FontFamily="{StaticResource IconFont}" Foreground="{DynamicResource SecondaryText}" VerticalAlignment="Center" />
+                <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" VerticalAlignment="Center">
+                    <ItemsControl ItemsSource="{Binding Crumbs}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="{Binding Name}" Padding="8,5" Background="Transparent" BorderThickness="0"
+                                            Command="{Binding DataContext.EnterCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding Id}" />
+                                    <TextBlock Text="›" Foreground="{DynamicResource SecondaryText}" VerticalAlignment="Center" Margin="2,0" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="320" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="660" MinWidth="300" />
+                </Grid.ColumnDefinitions>
+
+                <Grid Margin="12,4,4,4">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <controls:SunburstControl Tree="{Binding Tree}" Segments="{Binding Segments}"
+                                              SelectedNode="{Binding SelectedNode}" HoveredNode="{Binding HoveredNode}"
+                                              EnterCommand="{Binding EnterCommand}" UpCommand="{Binding UpCommand}" AnimationsEnabled="{Binding AnimationsEnabled}">
+                        <controls:SunburstControl.ContextMenu>
+                            <!-- Le clic droit sélectionne le segment ; les commandes agissent sur la sélection. -->
+                            <ContextMenu>
+                                <MenuItem Header="Entrer dans le dossier" Command="{Binding EnterSelectedCommand}" />
+                                <MenuItem Header="Aperçu" Command="{Binding PreviewCommand}" />
+                                <MenuItem Header="Ouvrir dans l'Explorateur" Command="{Binding RevealCommand}" />
+                                <MenuItem Header="Copier le chemin" Command="{Binding CopyPathCommand}" />
+                                <Separator />
+                                <MenuItem Header="Ajouter au panier" Command="{Binding AddToBasketCommand}" />
+                            </ContextMenu>
+                        </controls:SunburstControl.ContextMenu>
+                    </controls:SunburstControl>
+                    <StackPanel IsHitTestVisible="False" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="130">
+                        <TextBlock Text="{Binding CenterName}" FontWeight="SemiBold" TextAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding CurrentName}" />
+                        <TextBlock Text="{Binding CurrentSizeText}" FontSize="16" TextAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Margin="4,6,4,4" MinHeight="40">
+                        <TextBlock Text="{Binding InfoTitle}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding InfoPath}" Foreground="{DynamicResource SecondaryText}" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <!-- Actions sur l'élément choisi (dernier sélectionné dans le diagramme ou une liste). -->
+                    <DockPanel Grid.Row="2" Margin="4,2,4,6">
+                        <Button DockPanel.Dock="Right" Content="Ouvrir dans l'Explorateur" Command="{Binding RevealFocusCommand}" Padding="10,5" Margin="6,0,0,0" />
+                        <Button DockPanel.Dock="Right" Content="Ajouter au panier" Command="{Binding AddToBasketCommand}" Padding="10,5" Margin="6,0,0,0"
+                                ToolTip="Mettre l'élément choisi au panier. Rien n'est supprimé à cette étape." />
+                        <Button DockPanel.Dock="Right" Content="Aperçu" Command="{Binding PreviewCommand}" Padding="10,5" Margin="6,0,0,0" />
+                        <TextBlock Text="{Binding FocusText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource SecondaryText}"
+                                   AutomationProperties.AutomationId="FocusText" />
+                    </DockPanel>
+                </Grid>
+
+                <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{DynamicResource PanelBorder}" />
+
+                <TabControl Grid.Column="2" Margin="4,0,12,4" SelectedIndex="{Binding SelectedTab}">
+                    <TabItem Header="Contenu du dossier">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="{Binding ListHeader}" Foreground="{DynamicResource SecondaryText}" Margin="4,6" TextTrimming="CharacterEllipsis" />
+                            <views:EntryList DataContext="{Binding ContentList}" />
+                        </DockPanel>
+                    </TabItem>
+                    <TabItem Header="Recherche">
+                        <DockPanel>
+                            <Grid DockPanel.Dock="Top" Margin="4,8,4,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Nom" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Grid.Column="1" Margin="0,0,12,6" Text="{Binding SearchName, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="Nom contient" ToolTip="Partie du nom, sans distinction de casse" />
+                                <TextBlock Grid.Column="2" Text="Extensions" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Grid.Column="3" Margin="0,0,0,6" Text="{Binding SearchExtensions, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="Extensions" ToolTip="Une ou plusieurs extensions : mp4, mkv" />
+
+                                <TextBlock Grid.Row="1" Text="Catégorie" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,0,12,6" ItemsSource="{Binding CategoryChoices}" SelectedIndex="{Binding SearchCategory}"
+                                          AutomationProperties.Name="Catégorie" />
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="Éléments" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ComboBox Grid.Row="1" Grid.Column="3" Margin="0,0,0,6" ItemsSource="{Binding KindChoices}" SelectedIndex="{Binding SearchKind}"
+                                          AutomationProperties.Name="Éléments" />
+
+                                <TextBlock Grid.Row="2" Text="Taille min." VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Grid.Row="2" Grid.Column="1" Margin="0,0,12,0" Text="{Binding SearchMinSize, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="Taille minimale" ToolTip="Exemples : 500 Mo, 1,5 Go. Un nombre seul est en Mo." />
+                                <TextBlock Grid.Row="2" Grid.Column="2" Text="Taille max." VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <DockPanel Grid.Row="2" Grid.Column="3">
+                                    <Button DockPanel.Dock="Right" Content="Effacer" Command="{Binding ClearSearchCommand}" Padding="10,4" Margin="8,0,0,0" ToolTip="Vider tous les critères" />
+                                    <TextBox Text="{Binding SearchMaxSize, UpdateSourceTrigger=PropertyChanged}"
+                                             AutomationProperties.Name="Taille maximale" ToolTip="Exemples : 500 Mo, 1,5 Go. Un nombre seul est en Mo." />
+                                </DockPanel>
+                            </Grid>
+                            <TextBlock DockPanel.Dock="Top" Text="{Binding SearchSummary}" Foreground="{DynamicResource SecondaryText}" Margin="4,4,4,6" TextWrapping="Wrap"
+                                       AutomationProperties.AutomationId="SearchSummary" />
+                            <views:EntryList DataContext="{Binding SearchList}" />
+                        </DockPanel>
+                    </TabItem>
+                    <TabItem Header="Aperçu">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" DataContext="{Binding Preview}">
+                            <StackPanel Margin="8">
+                                <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" AutomationProperties.AutomationId="PreviewTitle" />
+                                <ItemsControl ItemsSource="{Binding Details}" Margin="0,8,0,4">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,1">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="190" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Key}" Foreground="{DynamicResource SecondaryText}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{Binding Note}" Foreground="{DynamicResource WarningText}" TextWrapping="Wrap" Margin="0,4"
+                                           Visibility="{Binding HasNote, Converter={StaticResource Visible}}" AutomationProperties.AutomationId="PreviewNote" />
+                                <StackPanel Orientation="Horizontal" Margin="0,6" Visibility="{Binding HasPages, Converter={StaticResource Visible}}">
+                                    <Button Content="Page précédente" Command="{Binding PreviousPageCommand}" Padding="10,4" />
+                                    <Button Content="Page suivante" Command="{Binding NextPageCommand}" Padding="10,4" Margin="6,0,10,0" />
+                                    <TextBlock Text="{Binding PageText}" VerticalAlignment="Center" AutomationProperties.AutomationId="PreviewPage" />
+                                </StackPanel>
+                                <Image Source="{Binding Image}" Stretch="Uniform" StretchDirection="DownOnly" MaxHeight="900" HorizontalAlignment="Left" Margin="0,6"
+                                       Visibility="{Binding HasImage, Converter={StaticResource Visible}}" AutomationProperties.Name="Aperçu en image" />
+                                <TextBox Text="{Binding Text, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" TextWrapping="NoWrap" MaxHeight="600" Margin="0,6"
+                                         HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                                         Visibility="{Binding HasText, Converter={StaticResource Visible}}" AutomationProperties.Name="Aperçu en texte" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                </TabControl>
+            </Grid>
+
+            <Border Grid.Row="2" BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0" Margin="12,2,12,0" Padding="0,8,0,4">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top">
+                        <Button DockPanel.Dock="Right" Content="Mettre à la Corbeille…" Command="{Binding DeleteBasketCommand}" Padding="12,5" Margin="8,0,0,0" VerticalAlignment="Top"
+                                ToolTip="Envoyer le contenu du panier à la Corbeille Windows, après confirmation" />
+                        <Button DockPanel.Dock="Right" Content="Vider le panier" Command="{Binding ClearBasketCommand}" Padding="12,5" VerticalAlignment="Top"
+                                ToolTip="Retirer tous les éléments du panier, sans rien supprimer" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding BasketSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="BasketSummary" />
+                            <TextBlock Text="{Binding BasketMessage}" Foreground="{DynamicResource WarningText}" TextWrapping="Wrap" AutomationProperties.AutomationId="BasketMessage" />
+                        </StackPanel>
+                    </DockPanel>
+                    <views:EntryList DataContext="{Binding BasketList}" Height="140" Margin="0,6,0,0"
+                                     Visibility="{Binding DataContext.HasBasketItems, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Visible}}" />
+                </DockPanel>
+            </Border>
+
+            <TextBlock Grid.Row="3" Text="{Binding StatusText}" ToolTip="{Binding StatusText}" Foreground="{DynamicResource SecondaryText}" TextTrimming="CharacterEllipsis" Margin="14,4,14,10" AutomationProperties.AutomationId="StatusText" />
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,7 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Couleurs propres à l'application, thème clair. Mêmes clés que Dark.xaml. -->
+    <SolidColorBrush x:Key="SecondaryText" Color="#5C606B" />
+    <SolidColorBrush x:Key="WarningText" Color="#9A5200" />
+    <SolidColorBrush x:Key="PanelBorder" Color="#CDD0D7" />
+</ResourceDictionary>

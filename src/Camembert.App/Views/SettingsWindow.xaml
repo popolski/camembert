@@ -1,0 +1,23 @@
+<Window x:Class="Camembert.App.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Paramètres — Camembert" Width="480" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <!-- DataContext : MainViewModel. Chaque changement s'applique et s'enregistre aussitôt. -->
+    <StackPanel Margin="22,18">
+        <TextBlock Text="Thème" FontWeight="SemiBold" />
+        <ComboBox ItemsSource="{Binding ThemeChoices}" SelectedIndex="{Binding ThemeIndex}" Margin="0,6,0,18"
+                  AutomationProperties.Name="Thème" />
+
+        <CheckBox Content="Animations du diagramme" IsChecked="{Binding AnimationsEnabled}" />
+        <TextBlock Text="Elles restent coupées si l'option « Effets d'animation » de Windows est désactivée."
+                   Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" Margin="28,4,0,18" />
+
+        <TextBlock Text="{Binding SettingsLocation}" Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap"
+                   AutomationProperties.AutomationId="SettingsLocation" />
+        <TextBlock Text="{Binding SettingsWarning}" Foreground="{DynamicResource WarningText}" TextWrapping="Wrap" Margin="0,6,0,0"
+                   AutomationProperties.AutomationId="SettingsWarning" />
+
+        <Button Content="Fermer" IsCancel="True" IsDefault="True" HorizontalAlignment="Right" Padding="18,6" Margin="0,18,0,0" Click="OnClose" />
+    </StackPanel>
+</Window>

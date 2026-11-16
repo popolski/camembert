@@ -1,0 +1,16 @@
+Camembert est distribué sous licence MIT (fichier LICENSE). Le ZIP portable contient aussi les composants
+suivants, chacun sous sa propre licence. Tous permettent la redistribution dans une application sous licence MIT.
+
+Composant                       Version    Licence                     Source
+------------------------------  ---------  --------------------------  ------------------------------------------------
+Runtime .NET et WPF             10.0       MIT                         https://github.com/dotnet/runtime
+                                                                       https://github.com/dotnet/wpf
+SkiaSharp, SkiaSharp.Views      4.156.1    MIT                         https://github.com/mono/SkiaSharp
+  (bibliothèque Skia incluse)              BSD 3 clauses               https://skia.org/
+Serilog, Serilog.Sinks.File     4.2 / 7.0  Apache 2.0                  https://github.com/serilog/serilog
+                                                                       https://www.apache.org/licenses/LICENSE-2.0
+OpenTK (dépendance de           4.3        MIT                         https://github.com/opentk/opentk
+  SkiaSharp.Views.WPF)
+GLFW (glfw3.dll, via OpenTK)    3.3        zlib/libpng                 https://www.glfw.org/license.html
+
+Les textes complets de ces licences sont disponibles aux adresses ci-dessus.
