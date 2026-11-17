@@ -17,6 +17,10 @@ public static class FileTypes
 
     public static string Label(FileCategory category) => Categories[category].Label;
 
+    /// <summary>Catégorie d'une extension (« .mp4 » → « Vidéos »), ou chaîne vide.</summary>
+    public static string CategoryOf(string extension) =>
+        Categories.Values.FirstOrDefault(c => c.Extensions.Contains(extension)).Label ?? "";
+
     /// <summary>Extensions de la catégorie, en minuscules avec le point.</summary>
     public static string[] Extensions(FileCategory category) => Categories[category].Extensions;
 

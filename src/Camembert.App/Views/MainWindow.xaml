@@ -10,6 +10,7 @@
     </Window.Resources>
     <Window.InputBindings>
         <KeyBinding Key="Back" Command="{Binding UpCommand}" />
+        <KeyBinding Key="Delete" Command="{Binding DeleteCommand}" />
     </Window.InputBindings>
 
     <Grid>
@@ -140,11 +141,36 @@
 
                 <Grid Margin="12,4,4,4">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <controls:SunburstControl Tree="{Binding Tree}" Segments="{Binding Segments}"
+                    <!-- Choix de la vue -->
+                    <StackPanel Orientation="Horizontal" Margin="4,0,4,4">
+                        <RadioButton Content="Cercles" IsChecked="{Binding IsSunburst}" GroupName="Vue" Margin="0,0,14,0" />
+                        <RadioButton Content="Rectangles" IsChecked="{Binding IsTreemap}" GroupName="Vue" Margin="0,0,24,0" />
+                        <CheckBox Content="Couleurs par type de fichier" IsChecked="{Binding ColorByType}"
+                                  Visibility="{Binding IsTreemap, Converter={StaticResource Visible}}" />
+                    </StackPanel>
+                    <controls:TreemapControl Grid.Row="1" Tree="{Binding Tree}" Root="{Binding Current}" TopHues="{Binding TopHues}"
+                                             TypeStats="{Binding TypeStats}" ColorByType="{Binding ColorByType}" HighlightRank="{Binding HighlightRank}"
+                                             SelectedNode="{Binding SelectedNode}" HoveredNode="{Binding HoveredNode}"
+                                             EnterCommand="{Binding EnterCommand}" UpCommand="{Binding UpCommand}"
+                                             Visibility="{Binding IsTreemap, Converter={StaticResource Visible}}">
+                        <controls:TreemapControl.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Entrer dans le dossier" Command="{Binding EnterSelectedCommand}" />
+                                <MenuItem Header="Aperçu" Command="{Binding PreviewCommand}" />
+                                <MenuItem Header="Ouvrir dans l'Explorateur" Command="{Binding RevealCommand}" />
+                                <MenuItem Header="Copier le chemin" Command="{Binding CopyPathCommand}" />
+                                <Separator />
+                                <MenuItem Header="Supprimer…" Command="{Binding DeleteCommand}" InputGestureText="Suppr" />
+                                <MenuItem Header="Ajouter à la liste à supprimer" Command="{Binding AddToBasketCommand}" />
+                            </ContextMenu>
+                        </controls:TreemapControl.ContextMenu>
+                    </controls:TreemapControl>
+                    <controls:SunburstControl Grid.Row="1" Visibility="{Binding IsSunburst, Converter={StaticResource Visible}}" Tree="{Binding Tree}" Segments="{Binding Segments}"
                                               SelectedNode="{Binding SelectedNode}" HoveredNode="{Binding HoveredNode}"
                                               EnterCommand="{Binding EnterCommand}" UpCommand="{Binding UpCommand}" AnimationsEnabled="{Binding AnimationsEnabled}">
                         <controls:SunburstControl.ContextMenu>
@@ -155,23 +181,27 @@
                                 <MenuItem Header="Ouvrir dans l'Explorateur" Command="{Binding RevealCommand}" />
                                 <MenuItem Header="Copier le chemin" Command="{Binding CopyPathCommand}" />
                                 <Separator />
-                                <MenuItem Header="Ajouter au panier" Command="{Binding AddToBasketCommand}" />
+                                <MenuItem Header="Supprimer…" Command="{Binding DeleteCommand}" InputGestureText="Suppr" />
+                                <MenuItem Header="Ajouter à la liste à supprimer" Command="{Binding AddToBasketCommand}" />
                             </ContextMenu>
                         </controls:SunburstControl.ContextMenu>
                     </controls:SunburstControl>
-                    <StackPanel IsHitTestVisible="False" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="130">
+                    <StackPanel Grid.Row="1" IsHitTestVisible="False" VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="130"
+                                Visibility="{Binding IsSunburst, Converter={StaticResource Visible}}">
                         <TextBlock Text="{Binding CenterName}" FontWeight="SemiBold" TextAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding CurrentName}" />
                         <TextBlock Text="{Binding CurrentSizeText}" FontSize="16" TextAlignment="Center" />
                     </StackPanel>
-                    <StackPanel Grid.Row="1" Margin="4,6,4,4" MinHeight="40">
+                    <StackPanel Grid.Row="2" Margin="4,6,4,4" MinHeight="40">
                         <TextBlock Text="{Binding InfoTitle}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding InfoPath}" Foreground="{DynamicResource SecondaryText}" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                     <!-- Actions sur l'élément choisi (dernier sélectionné dans le diagramme ou une liste). -->
-                    <DockPanel Grid.Row="2" Margin="4,2,4,6">
+                    <DockPanel Grid.Row="3" Margin="4,2,4,6">
                         <Button DockPanel.Dock="Right" Content="Ouvrir dans l'Explorateur" Command="{Binding RevealFocusCommand}" Padding="10,5" Margin="6,0,0,0" />
-                        <Button DockPanel.Dock="Right" Content="Ajouter au panier" Command="{Binding AddToBasketCommand}" Padding="10,5" Margin="6,0,0,0"
-                                ToolTip="Mettre l'élément choisi au panier. Rien n'est supprimé à cette étape." />
+                        <Button DockPanel.Dock="Right" Content="Ajouter à la liste à supprimer" Command="{Binding AddToBasketCommand}" Padding="10,5" Margin="6,0,0,0"
+                                ToolTip="Rassembler des éléments de dossiers différents pour les supprimer en une fois. Rien n'est supprimé à cette étape." />
+                        <Button DockPanel.Dock="Right" Content="Supprimer…" Command="{Binding DeleteCommand}" Padding="10,5" Margin="6,0,0,0"
+                                ToolTip="Envoyer l'élément choisi à la Corbeille, après confirmation (touche Suppr)" />
                         <Button DockPanel.Dock="Right" Content="Aperçu" Command="{Binding PreviewCommand}" Padding="10,5" Margin="6,0,0,0" />
                         <TextBlock Text="{Binding FocusText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource SecondaryText}"
                                    AutomationProperties.AutomationId="FocusText" />
@@ -183,7 +213,8 @@
                 <TabControl Grid.Column="2" Margin="4,0,12,4" SelectedIndex="{Binding SelectedTab}">
                     <TabItem Header="Contenu du dossier">
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="{Binding ListHeader}" Foreground="{DynamicResource SecondaryText}" Margin="4,6" TextTrimming="CharacterEllipsis" />
+                            <TextBlock DockPanel.Dock="Top" Text="{Binding ListHeader}" Foreground="{DynamicResource SecondaryText}" Margin="4,6" TextTrimming="CharacterEllipsis"
+                                       AutomationProperties.AutomationId="ListHeaderText" />
                             <views:EntryList DataContext="{Binding ContentList}" />
                         </DockPanel>
                     </TabItem>
@@ -263,16 +294,55 @@
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
+                    <TabItem Header="Types">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="{Binding TypesHeader}" Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" Margin="4,6"
+                                       AutomationProperties.AutomationId="TypesHeader" />
+                            <ListView x:Name="TypeList" ItemsSource="{Binding TypeRows}" SelectedItem="{Binding SelectedType}" SelectionMode="Single"
+                                      VirtualizingPanel.IsVirtualizing="True" MouseDoubleClick="OnTypeDoubleClick" KeyDown="OnTypeKeyDown">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Header="Type" Width="150">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Rectangle Width="12" Height="12" RadiusX="3" RadiusY="3" Fill="{Binding Color}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                        <TextBlock Text="{Binding Label}" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                        <GridViewColumn Header="Catégorie" Width="150" DisplayMemberBinding="{Binding Category}" />
+                                        <GridViewColumn Header="Taille" Width="90">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate><TextBlock Text="{Binding SizeText}" TextAlignment="Right" Width="72" /></DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                        <GridViewColumn Header="%" Width="62">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate><TextBlock Text="{Binding PercentText}" TextAlignment="Right" Width="44" Foreground="{DynamicResource SecondaryText}" /></DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                        <GridViewColumn Header="Fichiers" Width="90">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate><TextBlock Text="{Binding CountText}" TextAlignment="Right" Width="72" /></DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+                        </DockPanel>
+                    </TabItem>
                 </TabControl>
             </Grid>
 
             <Border Grid.Row="2" BorderBrush="{DynamicResource PanelBorder}" BorderThickness="0,1,0,0" Margin="12,2,12,0" Padding="0,8,0,4">
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top">
-                        <Button DockPanel.Dock="Right" Content="Mettre à la Corbeille…" Command="{Binding DeleteBasketCommand}" Padding="12,5" Margin="8,0,0,0" VerticalAlignment="Top"
-                                ToolTip="Envoyer le contenu du panier à la Corbeille Windows, après confirmation" />
-                        <Button DockPanel.Dock="Right" Content="Vider le panier" Command="{Binding ClearBasketCommand}" Padding="12,5" VerticalAlignment="Top"
-                                ToolTip="Retirer tous les éléments du panier, sans rien supprimer" />
+                        <Button DockPanel.Dock="Right" Content="Tout supprimer…" Command="{Binding DeleteBasketCommand}" Padding="12,5" Margin="8,0,0,0" VerticalAlignment="Top"
+                                ToolTip="Envoyer toute la liste à la Corbeille Windows, après confirmation" />
+                        <Button DockPanel.Dock="Right" Content="Vider la liste" Command="{Binding ClearBasketCommand}" Padding="12,5" VerticalAlignment="Top"
+                                ToolTip="Retirer tous les éléments de la liste, sans rien supprimer" />
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="{Binding BasketSummary}" TextWrapping="Wrap" AutomationProperties.AutomationId="BasketSummary" />
                             <TextBlock Text="{Binding BasketMessage}" Foreground="{DynamicResource WarningText}" TextWrapping="Wrap" AutomationProperties.AutomationId="BasketMessage" />

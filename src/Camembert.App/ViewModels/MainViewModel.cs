@@ -32,6 +32,13 @@ public sealed record VolumeRow(VolumeInfo Volume)
         : "Analyse rapide NTFS — demande les droits d'administrateur";
 }
 
+/// <summary>Ligne de l'onglet « Types ».</summary>
+public sealed record TypeRow(int Rank, string Extension, string Category, long Size, string SizeText, string PercentText, string CountText, System.Windows.Media.Brush Color)
+{
+    public string Label => Extension.Length > 0 ? Extension : "(sans extension)";
+    public override string ToString() => $"{Label}, {SizeText}"; // nom lu par les lecteurs d'écran
+}
+
 public sealed record Crumb(int Id, string Name)
 {
     public override string ToString() => Name; // nom lu par les lecteurs d'écran
@@ -81,8 +88,10 @@ public sealed class MainViewModel : ViewModelBase
         AddToBasketCommand = new RelayCommand(AddToBasket, () => HasFocus && !IsDeleting);
         RemoveFromBasketCommand = new RelayCommand(RemoveFromBasket, () => !IsDeleting);
         ClearBasketCommand = new RelayCommand(_ => { _basket?.Clear(); RefreshBasket(""); }, () => HasBasketItems && !IsDeleting);
-        DeleteBasketCommand = new RelayCommand(_ => _ = DeleteBasketAsync(), () => HasBasketItems && !IsDeleting);
+        DeleteBasketCommand = new RelayCommand(_ => _ = DeleteAsync(_basket!.Items.ToArray(), fromList: true), () => HasBasketItems && !IsDeleting);
+        DeleteCommand = new RelayCommand(target => _ = DeleteAsync(Targets(target), fromList: false), () => HasFocus && !IsDeleting);
         RevealFocusCommand = new RelayCommand(_ => Reveal(_focusNode), () => HasFocus);
+        SearchTypeCommand = new RelayCommand(row => SearchType((TypeRow)row!), () => SelectedType is { Extension.Length: > 0 });
 
         ContentList.UserSelected = row => { if (row is not null) SelectedNode = row.Id; };
         SearchList.UserSelected = row => { if (row is not null && Tree is not null) { SetFocus(row.Id); ShowInfo(row.Id); } };
@@ -110,13 +119,17 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand ClearSearchCommand { get; }
     /// <summary>Aperçu. Paramètre : identifiant, ou rien pour l'élément choisi.</summary>
     public ICommand PreviewCommand { get; }
-    /// <summary>Mettre au panier (ne supprime rien). Paramètre : tableau d'identifiants, ou rien pour l'élément choisi.</summary>
+    /// <summary>Envoyer à la Corbeille, après confirmation. Paramètre : tableau d'identifiants, ou rien pour l'élément choisi.</summary>
+    public ICommand DeleteCommand { get; }
+    /// <summary>Ajouter à la liste à supprimer (ne supprime rien). Paramètre : tableau d'identifiants, ou rien pour l'élément choisi.</summary>
     public ICommand AddToBasketCommand { get; }
     public ICommand RemoveFromBasketCommand { get; }
     public ICommand ClearBasketCommand { get; }
-    /// <summary>Envoyer le contenu du panier à la Corbeille Windows, après confirmation.</summary>
+    /// <summary>Envoyer toute la liste à supprimer à la Corbeille Windows, après confirmation.</summary>
     public ICommand DeleteBasketCommand { get; }
     public ICommand RevealFocusCommand { get; }
+    /// <summary>Lister dans l'onglet Recherche tous les fichiers du type choisi.</summary>
+    public ICommand SearchTypeCommand { get; }
 
     // ---------------------------------------------------------------- écrans
 
@@ -192,6 +205,10 @@ public sealed class MainViewModel : ViewModelBase
         Segments = null;
         _search = null;
         _basket = null;
+        _typesComputing?.Cancel();
+        TypeStats = null;
+        TypeRows = [];
+        SelectedType = null;
         _searchCancellation?.Cancel();
         ContentList.Load(null, [], null);
         SearchList.Load(null, [], null);
@@ -248,6 +265,7 @@ public sealed class MainViewModel : ViewModelBase
                 StatusText = BuildStatus(tree, progress, engine.Name) + fallbackNote;
                 Navigate(FileTree.Root);
                 Show(Screen.Result);
+                ComputeTypes();
                 ScheduleSearch();
                 return;
             }
@@ -329,7 +347,8 @@ public sealed class MainViewModel : ViewModelBase
     public int SelectedTab { get => _selectedTab; set => Set(ref _selectedTab, value); }
 
     /// <summary>Dossier affiché au centre du diagramme et dans la liste.</summary>
-    public int Current { get; private set; }
+    public int Current { get => _current; private set => Set(ref _current, value); }
+    int _current;
     public bool CanGoUp => IsResult && Tree is not null && Current != FileTree.Root;
 
     int _selectedNode = SunburstControl.NoNode, _hoveredNode = SunburstControl.NoNode;
@@ -387,6 +406,7 @@ public sealed class MainViewModel : ViewModelBase
         Raise(nameof(SelectedNode));
         Raise(nameof(HoveredNode));
         Segments = segments;
+        TopHues = hues;
         ContentList.Load(tree, children, _createContentRow);
         Crumbs = crumbs;
         CurrentName = node == FileTree.Root ? _rootPath : tree.Name(node);
@@ -410,7 +430,9 @@ public sealed class MainViewModel : ViewModelBase
     {
         if (Tree is null || node == SunburstControl.NoNode)
         {
-            InfoTitle = "Double-clic ou molette vers l'avant : entrer dans un dossier. Clic au centre, molette vers l'arrière ou Retour arrière : remonter.";
+            InfoTitle = IsTreemap
+                ? "Double-clic ou molette vers l'avant : entrer dans le dossier sous le pointeur. Molette vers l'arrière ou Retour arrière : remonter."
+                : "Double-clic ou molette vers l'avant : entrer dans un dossier. Clic au centre, molette vers l'arrière ou Retour arrière : remonter.";
             InfoPath = "";
             return;
         }
@@ -422,7 +444,7 @@ public sealed class MainViewModel : ViewModelBase
     // ---------------------------------------------------------------- actions sur les éléments
 
     // Élément « choisi » : le dernier sélectionné par l'utilisateur, dans le diagramme ou dans une des listes.
-    // C'est la cible des boutons Aperçu, Ajouter au panier et Ouvrir dans l'Explorateur.
+    // C'est la cible des boutons Aperçu, Supprimer, Ajouter à la liste à supprimer et Ouvrir dans l'Explorateur.
     int _focusNode = SunburstControl.NoNode;
     string _focusText = "Aucun élément choisi";
     public bool HasFocus => Tree is not null && _focusNode != SunburstControl.NoNode && !Tree.IsRemoved(_focusNode);
@@ -472,6 +494,102 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    // ---------------------------------------------------------------- vue rectangles et types de fichiers
+
+    IReadOnlyDictionary<int, float>? _topHues;
+    /// <summary>Teintes des éléments de premier niveau (diagramme, liste et vue rectangles en couleurs par dossier).</summary>
+    public IReadOnlyDictionary<int, float>? TopHues { get => _topHues; private set => Set(ref _topHues, value); }
+
+    public bool IsTreemap
+    {
+        get => _settings.Treemap;
+        set
+        {
+            if (value == _settings.Treemap) return;
+            SaveSettings(_settings with { Treemap = value });
+            Raise(nameof(IsTreemap));
+            Raise(nameof(IsSunburst));
+            ShowInfo(_selectedNode);
+        }
+    }
+    public bool IsSunburst { get => !IsTreemap; set => IsTreemap = !value; }
+
+    public bool ColorByType
+    {
+        get => _settings.ColorByType;
+        set
+        {
+            if (value == _settings.ColorByType) return;
+            SaveSettings(_settings with { ColorByType = value });
+            Raise(nameof(ColorByType));
+        }
+    }
+
+    FileTypeStats? _typeStats;
+    public FileTypeStats? TypeStats { get => _typeStats; private set => Set(ref _typeStats, value); }
+
+    List<TypeRow> _typeRows = [];
+    public List<TypeRow> TypeRows { get => _typeRows; private set => Set(ref _typeRows, value); }
+
+    string _typesHeader = "";
+    public string TypesHeader { get => _typesHeader; private set => Set(ref _typesHeader, value); }
+
+    TypeRow? _selectedType;
+    /// <summary>Type choisi dans l'onglet « Types » : mis en évidence dans la vue rectangles.</summary>
+    public TypeRow? SelectedType
+    {
+        get => _selectedType;
+        set
+        {
+            if (!Set(ref _selectedType, value)) return;
+            Raise(nameof(HighlightRank));
+            if (value is not null) IsTreemap = true; // la mise en évidence se voit dans la vue rectangles
+            CommandManager.InvalidateRequerySuggested();
+        }
+    }
+    public int HighlightRank => _selectedType?.Rank ?? -1;
+
+    CancellationTokenSource? _typesComputing;
+
+    /// <summary>Répartition par type sur toute l'analyse, en arrière-plan (après l'analyse et après chaque suppression).</summary>
+    async void ComputeTypes()
+    {
+        _typesComputing?.Cancel();
+        if (Tree is not { } tree) return;
+        var computing = _typesComputing = new CancellationTokenSource();
+        TypesHeader = "Calcul de la répartition par type…";
+        try
+        {
+            var stats = await Task.Run(() => FileTypeStats.Compute(tree, computing.Token), computing.Token);
+            if (computing.IsCancellationRequested || !ReferenceEquals(tree, Tree)) return;
+            long total = Math.Max(stats.Totals.Sum(t => t.Size), 1);
+            string? previous = _selectedType?.Extension;
+            TypeStats = stats;
+            TypeRows = stats.Totals.Take(500).Select((t, rank) => new TypeRow(rank, t.Extension, FileTypes.CategoryOf(t.Extension), t.Size,
+                SizeFormat.Format(t.Size), EntryRow.Percent(t.Size, total), SizeFormat.Count(t.Count), Palette.TypeBrush(rank))).ToList();
+            _selectedType = TypeRows.FirstOrDefault(r => r.Extension == previous);
+            Raise(nameof(SelectedType));
+            Raise(nameof(HighlightRank));
+            TypesHeader = $"{SizeFormat.Count(stats.Totals.Count)} types de fichiers sur toute l'analyse" +
+                          (stats.Totals.Count > TypeRows.Count ? $" ({TypeRows.Count} premiers affichés)" : "") +
+                          ". Clic : mettre en évidence dans la vue rectangles. Double-clic ou Entrée : lister ces fichiers.";
+        }
+        catch (OperationCanceledException)
+        {
+            // Nouvelle analyse ou nouvelle suppression entre-temps.
+        }
+    }
+
+    void SearchType(TypeRow row)
+    {
+        if (row.Extension.Length == 0) return;
+        SearchName = SearchMinSize = SearchMaxSize = "";
+        SearchCategory = 0;
+        SearchKind = 0;
+        SearchExtensions = row.Extension;
+        SelectedTab = 1;
+    }
+
     // ---------------------------------------------------------------- réglages
 
     public string[] ThemeChoices { get; } = ["Selon Windows", "Clair", "Sombre"];
@@ -519,12 +637,14 @@ public sealed class MainViewModel : ViewModelBase
         SelectedTab = 2;
     }
 
-    // ---------------------------------------------------------------- panier et suppression
+    // ---------------------------------------------------------------- suppression et liste à supprimer
+    // Suppression directe (élément choisi ou sélection) ; la « liste à supprimer » (classe Basket) sert à rassembler
+    // des éléments de dossiers différents avant de les supprimer en une fois.
 
     string _basketSummary = "", _basketMessage = "";
     bool _isDeleting;
     public string BasketSummary { get => _basketSummary; private set => Set(ref _basketSummary, value); }
-    /// <summary>Compte rendu de la dernière action sur le panier (ajout refusé, suppression effectuée…).</summary>
+    /// <summary>Compte rendu de la dernière suppression ou du dernier ajout à la liste.</summary>
     public string BasketMessage { get => _basketMessage; private set => Set(ref _basketMessage, value); }
     public bool HasBasketItems => _basket is { Items.Count: > 0 };
     public bool IsDeleting { get => _isDeleting; private set { if (Set(ref _isDeleting, value)) CommandManager.InvalidateRequerySuggested(); } }
@@ -534,6 +654,9 @@ public sealed class MainViewModel : ViewModelBase
     void RefreshBasket(string message)
     {
         BasketMessage = message;
+        // Éléments disparus avec un dossier supprimé entre-temps.
+        if (Tree is { } current && _basket is { } list)
+            foreach (int id in list.Items.Where(current.IsRemoved).ToList()) list.Remove(id);
         if (Tree is not { } tree || _basket is not { } basket)
         {
             BasketList.Load(null, [], null);
@@ -546,8 +669,8 @@ public sealed class MainViewModel : ViewModelBase
             long total = tree.Size(FileTree.Root);
             BasketList.Load(tree, ids, id => new EntryRow(tree, id, total, Palette.SmallItemBrush, showLocation: true));
             BasketSummary = ids.Length == 0
-                ? "Panier vide. Choisissez un élément puis « Ajouter au panier » : rien n'est supprimé tant que vous ne l'avez pas confirmé."
-                : $"Panier : {Plural(ids.Length, "élément", "éléments")}, {SizeFormat.Format(basket.TotalSize)} récupérables une fois la Corbeille vidée.";
+                ? "Liste à supprimer vide. Pour supprimer en une fois des éléments de dossiers différents, ajoutez-les-y ; « Supprimer… » agit tout de suite sur l'élément choisi."
+                : $"Liste à supprimer : {Plural(ids.Length, "élément", "éléments")}, {SizeFormat.Format(basket.TotalSize)}, récupérables une fois la Corbeille vidée.";
         }
         Raise(nameof(HasBasketItems));
         CommandManager.InvalidateRequerySuggested();
@@ -566,8 +689,8 @@ public sealed class MainViewModel : ViewModelBase
             else already++;
         }
         var parts = new List<string>();
-        if (added > 0) parts.Add(Plural(added, "élément ajouté au panier.", "éléments ajoutés au panier."));
-        if (already > 0) parts.Add(Plural(already, "élément déjà dans le panier (lui-même ou son dossier).", "éléments déjà dans le panier (eux-mêmes ou leur dossier)."));
+        if (added > 0) parts.Add(Plural(added, "élément ajouté à la liste à supprimer.", "éléments ajoutés à la liste à supprimer."));
+        if (already > 0) parts.Add(Plural(already, "élément déjà dans la liste (lui-même ou son dossier).", "éléments déjà dans la liste (eux-mêmes ou leur dossier)."));
         if (refused.Count > 0) parts.Add("Emplacement protégé, non ajouté — " + string.Join(" ; ", refused.Take(3)) + (refused.Count > 3 ? $" ; et {refused.Count - 3} autres" : ""));
         RefreshBasket(string.Join(" ", parts));
     }
@@ -579,19 +702,40 @@ public sealed class MainViewModel : ViewModelBase
         RefreshBasket("");
     }
 
-    async Task DeleteBasketAsync()
+    /// <param name="fromList">Suppression de la liste à supprimer (sinon : suppression directe).</param>
+    async Task DeleteAsync(int[] targets, bool fromList)
     {
-        if (Tree is not { } tree || _basket is not { } basket || basket.Items.Count == 0) return;
-        var ids = basket.Items.ToArray();
+        if (Tree is not { } tree || _basket is not { } basket || targets.Length == 0) return;
+        var window = Application.Current.MainWindow;
+
+        // Emplacements protégés écartés ; un élément contenu dans un dossier aussi visé n'est compté qu'une fois.
+        var refused = new List<string>();
+        var selection = new Basket(tree);
+        foreach (int id in targets.Where(id => !tree.IsRemoved(id)))
+        {
+            if (_rules.BlockReason(tree.GetPath(id)) is { } reason) refused.Add($"{tree.Name(id)} : {reason}");
+            else selection.Add(id);
+        }
+        string refusedText = refused.Count == 0 ? "" :
+            "Emplacements protégés, non supprimés :\n" + string.Join("\n", refused.Take(5).Select(r => "   " + r)) +
+            (refused.Count > 5 ? $"\n   … et {refused.Count - 5} autres" : "");
+        if (selection.Items.Count == 0)
+        {
+            if (refused.Count > 0) MessageBox.Show(window, refusedText, "Camembert — suppression refusée", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var ids = selection.Items.ToArray();
         var requests = ids.Select(id => new DeleteRequest(id, tree.GetPath(id), tree.IsDirectory(id), tree.Size(id), tree.ModifiedTicks(id))).ToList();
 
         // Confirmation explicite, « Non » par défaut.
         var lines = requests.Take(8).Select(r => "   " + r.Path).ToList();
         if (requests.Count > 8) lines.Add($"   … et {requests.Count - 8} autres");
-        string question = $"Envoyer {Plural(ids.Length, "élément", "éléments")} ({SizeFormat.Format(basket.TotalSize)}) à la Corbeille Windows ?\n\n" +
+        string question = $"Supprimer {Plural(ids.Length, "élément", "éléments")} ({SizeFormat.Format(selection.TotalSize)}) ?\n\n" +
                           string.Join("\n", lines) +
-                          "\n\nVous pourrez les restaurer depuis la Corbeille. Rien n'est supprimé définitivement par Camembert.";
-        var window = Application.Current.MainWindow;
+                          (ids.Length > 1 ? "\n\nIls iront dans la Corbeille Windows, d'où vous pourrez les restaurer."
+                                          : "\n\nIl ira dans la Corbeille Windows, d'où vous pourrez le restaurer.") +
+                          " Rien n'est supprimé définitivement par Camembert." +
+                          (refusedText.Length > 0 ? "\n\n" + refusedText : "");
         if (MessageBox.Show(window, question, "Camembert — confirmer la suppression", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
             return;
 
@@ -638,6 +782,7 @@ public sealed class MainViewModel : ViewModelBase
         while (current > FileTree.Root && tree.IsRemoved(current)) current = tree.Parent(current);
         Navigate(current);
         ScheduleSearch();
+        ComputeTypes();
         foreach (var result in results)
         {
             if (result.Deleted) Log.Information("Envoyé à la Corbeille : {Path}", result.Request.Path);
@@ -647,7 +792,9 @@ public sealed class MainViewModel : ViewModelBase
         string report = deleted > 0
             ? $"{Plural(deleted, "élément envoyé", "éléments envoyés")} à la Corbeille ({SizeFormat.Format(freed)}). La Corbeille est sur le même disque : l'espace sera libéré quand vous la viderez."
             : "Rien n'a été supprimé.";
-        if (failures.Count > 0) report += $" {Plural(failures.Count, "élément non supprimé, resté", "éléments non supprimés, restés")} dans le panier.";
+        if (failures.Count > 0)
+            report += " " + (fromList ? Plural(failures.Count, "élément non supprimé, resté dans la liste.", "éléments non supprimés, restés dans la liste.")
+                                      : Plural(failures.Count, "élément non supprimé.", "éléments non supprimés."));
         RefreshBasket(report);
         if (failures.Count > 0)
         {

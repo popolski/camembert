@@ -12,6 +12,10 @@ public sealed record AppSettings
     public AppTheme Theme { get; init; } = AppTheme.System;
     /// <summary>Animations du diagramme (elles restent coupées si Windows a ses animations désactivées).</summary>
     public bool Animations { get; init; } = true;
+    /// <summary>Vue « rectangles » plutôt que le diagramme circulaire.</summary>
+    public bool Treemap { get; init; }
+    /// <summary>Vue « rectangles » colorée par type de fichier plutôt que par dossier.</summary>
+    public bool ColorByType { get; init; }
 }
 
 /// <summary>

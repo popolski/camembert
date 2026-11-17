@@ -35,8 +35,8 @@ public partial class EntryList : UserControl
         if (e.Key == Key.Enter) Activate();
         else if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control) Main?.CopyPathCommand.Execute(SelectedIds);
         else if (e.Key == Key.Space) Main?.PreviewCommand.Execute(Primary?.Id);
-        // Suppr n'efface rien du disque : il met au panier (ou retire du panier dans la liste du panier).
-        else if (e.Key == Key.Delete) (IsBasket ? Main?.RemoveFromBasketCommand : Main?.AddToBasketCommand)?.Execute(SelectedIds);
+        // Suppr : supprimer (avec confirmation), comme dans l'Explorateur ; dans la liste à supprimer, en retirer.
+        else if (e.Key == Key.Delete) (IsBasket ? Main?.RemoveFromBasketCommand : Main?.DeleteCommand)?.Execute(SelectedIds);
         else return;
         e.Handled = true;
     }
@@ -60,6 +60,7 @@ public partial class EntryList : UserControl
         LocateItem.Visibility = single && !isContent ? Visibility.Visible : Visibility.Collapsed;
         RevealItem.Visibility = PreviewItem.Visibility = single ? Visibility.Visible : Visibility.Collapsed;
         AddToBasketItem.Visibility = IsBasket ? Visibility.Collapsed : Visibility.Visible;
+        DeleteItem.InputGestureText = IsBasket ? "" : "Suppr";
         RemoveFromBasketItem.Visibility = IsBasket ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -67,6 +68,7 @@ public partial class EntryList : UserControl
     void OnLocate(object sender, RoutedEventArgs e) => Main?.LocateCommand.Execute(Primary?.Id);
     void OnReveal(object sender, RoutedEventArgs e) => Main?.RevealCommand.Execute(Primary?.Id);
     void OnPreview(object sender, RoutedEventArgs e) => Main?.PreviewCommand.Execute(Primary?.Id);
+    void OnDelete(object sender, RoutedEventArgs e) => Main?.DeleteCommand.Execute(SelectedIds);
     void OnAddToBasket(object sender, RoutedEventArgs e) => Main?.AddToBasketCommand.Execute(SelectedIds);
     void OnRemoveFromBasket(object sender, RoutedEventArgs e) => Main?.RemoveFromBasketCommand.Execute(SelectedIds);
     void OnCopyPath(object sender, RoutedEventArgs e) => Main?.CopyPathCommand.Execute(SelectedIds);

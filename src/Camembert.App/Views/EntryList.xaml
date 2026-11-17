@@ -15,8 +15,9 @@
                 <MenuItem x:Name="RevealItem" Header="Ouvrir dans l'Explorateur" Click="OnReveal" />
                 <MenuItem Header="Copier le chemin" Click="OnCopyPath" InputGestureText="Ctrl+C" />
                 <Separator />
-                <MenuItem x:Name="AddToBasketItem" Header="Ajouter au panier" Click="OnAddToBasket" InputGestureText="Suppr" />
-                <MenuItem x:Name="RemoveFromBasketItem" Header="Retirer du panier" Click="OnRemoveFromBasket" InputGestureText="Suppr" />
+                <MenuItem x:Name="DeleteItem" Header="Supprimer…" Click="OnDelete" />
+                <MenuItem x:Name="AddToBasketItem" Header="Ajouter à la liste à supprimer" Click="OnAddToBasket" />
+                <MenuItem x:Name="RemoveFromBasketItem" Header="Retirer de la liste" Click="OnRemoveFromBasket" InputGestureText="Suppr" />
             </ContextMenu>
         </ListView.ContextMenu>
         <ListView.View>

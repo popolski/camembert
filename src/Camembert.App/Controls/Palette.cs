@@ -18,6 +18,15 @@ public static class Palette
 
     public static Brush Brush(float hue, bool isDirectory) => Frozen(Color(hue, 1, isDirectory));
 
+    /// <summary>Nombre de types de fichiers qui reçoivent une couleur propre ; les suivants sont gris.</summary>
+    public const int TypeColors = 16;
+
+    /// <summary>Couleur d'un type de fichier selon son rang (0 = le plus volumineux) ; teintes espacées du nombre d'or.</summary>
+    public static SKColor TypeColor(int rank) =>
+        rank is >= 0 and < TypeColors ? SKColor.FromHsl(rank * 137.508f % 360, 58, rank < 8 ? 52 : 64) : SKColor.FromHsl(225, 6, 50);
+
+    public static Brush TypeBrush(int rank) => Frozen(TypeColor(rank));
+
     static Brush Frozen(SKColor c)
     {
         var brush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(c.Red, c.Green, c.Blue));

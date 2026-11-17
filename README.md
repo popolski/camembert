@@ -64,12 +64,17 @@ refusée ou si la lecture échoue, l'analyse standard prend le relais et la barr
 
 ## Utilisation
 
-- **Diagramme** : le disque central est le dossier courant, chaque anneau un niveau (6 au plus).
-  Survol : nom, taille, pourcentage, chemin. Clic : sélection, reportée dans la liste.
-  Double-clic sur un dossier : y entrer. Clic au centre ou touche Retour arrière : remonter.
-  **Molette** : vers l'avant, entrer dans le dossier survolé ; vers l'arrière, remonter (la molette navigue, elle ne zoome pas).
-  Clic droit : entrer, ouvrir dans l'Explorateur, copier le chemin.
-  Le changement de dossier est animé (250 ms) ; l'animation suit le réglage Windows « Effets d'animation ».
+- **Deux vues**, au choix au-dessus du dessin (mémorisé) :
+  - **Cercles** : le disque central est le dossier courant, chaque anneau un niveau (6 au plus).
+    Clic au centre : remonter. Le changement de dossier est animé (250 ms), sauf si les animations sont coupées.
+  - **Rectangles** : chaque fichier est un rectangle d'aire proportionnelle à sa taille, rangé dans le rectangle de
+    son dossier ; les gros fichiers isolés sautent aux yeux. Couleurs par dossier (celles de la liste) ou, case
+    « Couleurs par type de fichier », par type (celles de l'onglet Types). Les éléments trop petits pour être
+    dessinés sont regroupés en un rectangle gris ; ils restent dans la liste et la recherche.
+
+  Dans les deux vues : survol = nom, taille, pourcentage, chemin ; clic = sélection, reportée dans la liste ;
+  double-clic ou molette vers l'avant = entrer dans le dossier sous le pointeur ; molette vers l'arrière ou
+  Retour arrière = remonter ; clic droit = menu.
 - **Liste** (onglet « Contenu du dossier ») : nom, taille, pourcentage, type, date de modification. Clic sur un
   en-tête : tri, second clic : ordre inverse. Sélection multiple avec Ctrl et Maj. Double-clic ou Entrée : entrer
   dans un dossier. Clic droit : mêmes actions ; Ctrl+C copie les chemins sélectionnés.
@@ -77,31 +82,34 @@ refusée ou si la lecture échoue, l'analyse standard prend le relais et la barr
   Critères cumulables : partie du nom (sans distinction de casse), extensions (`mp4, mkv`), catégorie, fichiers ou
   dossiers, taille minimale et maximale (`500 Mo`, `1,5 Go` ; un nombre seul est en Mo).
   Double-clic sur un résultat : l'afficher dans son dossier, dans le diagramme et la liste.
+- **Types** (onglet) : espace occupé par extension sur toute l'analyse (taille, pourcentage, nombre de fichiers,
+  catégorie). Clic sur un type : ses fichiers sont mis en évidence dans la vue Rectangles (le reste est estompé).
+  Double-clic ou Entrée : lister tous ses fichiers dans l'onglet Recherche.
 - **Fil d'Ariane** : clic sur un niveau pour y revenir.
-- **Élément choisi** : le dernier élément sélectionné, dans le diagramme ou dans une liste, est rappelé sous le
-  diagramme avec trois boutons : « Aperçu », « Ajouter au panier », « Ouvrir dans l'Explorateur ».
+- **Élément choisi** : le dernier élément sélectionné, dans le dessin ou dans une liste, est rappelé sous le
+  dessin avec ses actions : « Aperçu », « Supprimer… », « Ajouter à la liste à supprimer », « Ouvrir dans l'Explorateur ».
 - **Aperçu** (bouton, clic droit ou touche Espace dans une liste) : image (JPEG, PNG, GIF, BMP, WebP, TIFF), texte
   (64 Ko au plus, encodage détecté), PDF page par page, vidéo (durée, dimensions, miniature) ; pour le reste, nom,
   taille, dates et chemin. Un fichier cloud non téléchargé n'est jamais lu, pour ne pas déclencher son téléchargement.
 
-## Panier et suppression
+## Suppression
 
-Le panier, en bas de la fenêtre, rassemble ce que vous envisagez de supprimer. Y mettre un élément ne supprime rien.
-
-1. Choisir un élément puis « Ajouter au panier » (ou clic droit, ou touche Suppr dans une liste).
-   Un dossier remplace ce qu'il contient déjà dans le panier : le total ne compte rien deux fois.
-2. « Mettre à la Corbeille… » affiche la liste et demande confirmation (« Non » par défaut).
-3. Chaque élément part vers la **Corbeille Windows** (API Shell `IFileOperation`) : il reste restaurable.
-4. La Corbeille étant sur le même disque, l'espace n'est réellement libéré qu'en la vidant (dans Windows ;
-   Camembert ne vide jamais la Corbeille).
-5. Les tailles sont mises à jour partout sans nouvelle analyse ; ce qui n'a pas pu être supprimé reste dans le
-   panier, avec la raison.
+- **Supprimer…** (bouton sous le dessin, clic droit, ou touche **Suppr**) : l'élément choisi, ou toute la sélection
+  de la liste. Une confirmation affiche les chemins et la taille (« Non » par défaut), puis les éléments partent dans
+  la **Corbeille Windows** (API Shell `IFileOperation`), d'où ils restent restaurables.
+- **Liste à supprimer** (en bas de la fenêtre) : pour rassembler des éléments de dossiers différents et les supprimer
+  en une fois (« Tout supprimer… »). Y ajouter un élément ne supprime rien ; un dossier remplace ce qu'il contient
+  déjà dans la liste, donc le total ne compte rien deux fois. « Vider la liste » la vide sans rien supprimer.
+- La Corbeille étant sur le même disque, l'espace n'est réellement libéré qu'en la vidant (Nettoyage recommandé,
+  ou Windows).
+- Les tailles sont mises à jour partout sans nouvelle analyse ; ce qui n'a pas pu être supprimé est signalé avec la
+  raison (et reste dans la liste à supprimer, si la suppression venait de là).
 
 Garde-fous :
 
 - Jamais de suppression définitive par l'application. Sur un disque sans Corbeille (clé USB, réseau), la suppression
   est refusée. Si un élément est trop gros pour la Corbeille, c'est Windows qui avertit et demande.
-- Emplacements protégés, refusés dès l'ajout au panier : tout élément à la racine d'un disque ; `Windows`,
+- Emplacements protégés, refusés avant toute suppression : tout élément à la racine d'un disque ; `Windows`,
   `Program Files`, `ProgramData` en entier ; `Users`, chaque profil et ses éléments directs (`Documents`, `Bureau`…) ;
   `AppData\Local`, `Roaming` et `LocalLow` eux-mêmes ; `System Volume Information`, `$Recycle.Bin`, `Recovery` et
   les fichiers système NTFS.
@@ -126,7 +134,7 @@ Sur l'accueil, sous les volumes, mesuré en arrière-plan à chaque retour à l'
 | `hiberfil.sys`, `Windows.old` (plus de 100 Mo) | Information : comment les supprimer avec Windows |
 
 Chaque action demande confirmation (« Non » par défaut) et refait la liste juste avant, pour confirmer exactement
-ce qui sera envoyé. Les éléments passent par les mêmes vérifications que le panier ; ceux qui sont ouverts par un
+ce qui sera envoyé. Les éléments passent par les mêmes vérifications que toute suppression ; ceux qui sont ouverts par un
 programme (navigateur lancé…) sont laissés en place et comptés. Camembert ne supprime rien dans le dossier Windows :
 il renvoie vers les outils de Windows, qui le font avec les droits nécessaires.
 
@@ -134,7 +142,7 @@ il renvoie vers les outils de Windows, qui le font avec les droits nécessaires.
 
 | Projet | Rôle |
 |---|---|
-| `Camembert.Core` | Nettoyage recommandé (`Cleanup`), réglages (`SettingsStore`), messages d'erreur en français (`ErrorText`), arbre compact (`FileTree`), agrégation, modèle du sunburst, recherche (`TreeSearch`), panier (`Basket`), emplacements protégés (`DeletionRules`), contrat `IScanEngine` |
+| `Camembert.Core` | Vue rectangles (`TreemapLayout`), types de fichiers (`FileTypeStats`), nettoyage recommandé (`Cleanup`), réglages (`SettingsStore`), messages d'erreur en français (`ErrorText`), arbre compact (`FileTree`), agrégation, modèle du sunburst, recherche (`TreeSearch`), panier (`Basket`), emplacements protégés (`DeletionRules`), contrat `IScanEngine` |
 | `Camembert.Scanner` | `Standard/StandardScanEngine` et `Ntfs/NtfsScanEngine` (+ `MftIndex`, décodage des enregistrements) |
 | `Camembert.Windows` | Volumes, Explorateur, Corbeille (`Shell/SafeDelete`, `Shell/RecycleBin`), aperçus (`Preview/PreviewLoader`), analyse dans un processus élevé (`Elevation/ElevatedScan`) |
 | `Camembert.App` | Fenêtre WPF, ViewModels, contrôle sunburst SkiaSharp, thèmes (`Themes/`), journal |
@@ -184,7 +192,7 @@ Les enfants d'un dossier s'ajoutent en un seul bloc (`AddChildren`), donc un par
 | Jonctions, liens symboliques, hard links | Oui | Tests automatiques (moteur standard et MFT). |
 | Navigation sunburst et synchronisation avec la liste | Oui | Vérifiée dans l'application. |
 | Recherche et filtrage sur un grand volume | Oui | 4 millions d'entrées : 3 à 300 ms. |
-| Sélection multiple sans double comptage | Oui | Panier : tests automatiques et application. |
+| Sélection multiple sans double comptage | Oui | Liste à supprimer : tests automatiques et application. |
 | Envoi vers la Corbeille après confirmation | Oui | Test automatique et application (fichiers d'essai). |
 | Refus des dossiers système critiques | Oui | Tests automatiques et application (`C:\Windows\Web`). |
 | Prévisualisation image, texte, PDF | Oui | Tests automatiques et application. |
