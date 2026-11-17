@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <AssemblyName>Camembert</AssemblyName>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Product>Camembert</Product>
     <Description>Analyseur d'espace disque pour Windows</Description>
     <ApplicationIcon>camembert.ico</ApplicationIcon>
